@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Assessment {
+  id             String   @id @default(uuid())
+  status         String   @default("uploading") // uploading, parsing, ready, completed
+  resumeText     String?
+  extractedStack Json?    // {"skills": ["Node", "Postgres"]}
+  swotAnalysis   Json?    // {"strengths": [], "weaknesses": [], ...}
+  score          Int?
+  percentile     Float?
+  createdAt      DateTime @default(now())
+  
+  // Relations
+  questions      Question[]
+}
+
+model Question {
+  id           String     @id @default(uuid())
+  assessmentId String
+  text         String
+  options      Json       // [{"id": "a", "text": "..."}]
+  correctOption String
+  userAnswer   String?
+  
+  assessment   Assessment @relation(fields: [assessmentId], references: [id])
+}
