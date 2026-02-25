@@ -2,20 +2,12 @@ import 'dotenv/config';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
-import { PrismaClient } from '@prisma/client';
-import pg from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 
-// CRITICAL: In Node ESM, local imports must end in .js (even if the file is .ts)
+// CRITICAL: In Node ESM, local imports must end in .js
+import { connectDB, Assessment, Question } from './models.js'; 
 import { assessmentQueue } from './queue.js'; 
 
 const fastify = Fastify({ logger: true });
-
-// 1. Initialize Prisma with the PG Adapter
-const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 
 // Plugins
 fastify.register(cors, { origin: '*' });
@@ -29,31 +21,24 @@ fastify.post('/upload', async (request, reply) => {
   if (!data) return reply.status(400).send({ error: 'No file uploaded' });
 
   const buffer = await data.toBuffer();
-  
-  // Convert buffer to base64 so it serializes safely into Redis
   const fileBase64 = buffer.toString('base64');
 
-  // Create db record
-  const assessment = await prisma.assessment.create({
-    data: { status: 'uploading' }
-  });
+  // Create db record using Mongoose
+  const assessment = await Assessment.create({ status: 'uploading' });
 
-  // Throw job into BullMQ
   await assessmentQueue.add('parse-resume', {
-    assessmentId: assessment.id,
+    assessmentId: assessment._id.toString(), // Pass stringified ObjectId
     fileBase64 
   });
 
-  return reply.send({ uploadId: assessment.id });
+  return reply.send({ uploadId: assessment._id });
 });
 
 // Polling Route
 fastify.get('/status/:id', async (request, reply) => {
   const { id } = request.params as { id: string };
-  const assessment = await prisma.assessment.findUnique({
-    where: { id },
-    select: { status: true }
-  });
+  
+  const assessment = await Assessment.findById(id).select('status');
 
   if (!assessment) return reply.status(404).send({ error: 'Not found' });
   return reply.send({ ready: assessment.status === 'ready', status: assessment.status });
@@ -62,11 +47,19 @@ fastify.get('/status/:id', async (request, reply) => {
 // Get Questions Route
 fastify.get('/test/:id/questions', async (request, reply) => {
   const { id } = request.params as { id: string };
-  const questions = await prisma.question.findMany({
-    where: { assessmentId: id },
-    select: { id: true, text: true, options: true } 
-  });
-  return reply.send({ questions });
+  
+  // Notice we added 'skill' to the select statement
+  const questions = await Question.find({ assessmentId: id })
+    .select('_id skill text options'); 
+
+  const formattedQuestions = questions.map(q => ({
+    id: q._id,
+    skill: q.skill, // Pass skill to frontend
+    text: q.text,
+    options: q.options
+  }));
+
+  return reply.send({ questions: formattedQuestions });
 });
 
 // Submit Test & Calculate Percentile Route
@@ -74,41 +67,84 @@ fastify.post('/test/:id/submit', async (request, reply) => {
   const { id } = request.params as { id: string };
   const { answers } = request.body as { answers: Record<string, string> };
 
-  const questions = await prisma.question.findMany({ where: { assessmentId: id } });
+  const questions = await Question.find({ assessmentId: id });
   
-  // Calculate Score
   let score = 0;
+  // Object to track correct answers per skill
+  const skillStats: Record<string, { total: number; correct: number }> = {};
+
   for (const q of questions) {
-    if (answers[q.id] === q.correctOption) score += 10;
+    const questionIdStr = q._id.toString();
+    const isCorrect = answers[questionIdStr] === q.correctOption;
+    const skill = q.skill || 'General';
+
+    // Initialize skill tracking
+    if (!skillStats[skill]) {
+      skillStats[skill] = { total: 0, correct: 0 };
+    }
+    skillStats[skill].total += 1;
+
+    if (isCorrect) {
+      score += 2; // 2 points per question (50 qs = 100 max)
+      skillStats[skill].correct += 1;
+    }
     
-    await prisma.question.update({
-      where: { id: q.id },
-      data: { userAnswer: answers[q.id] || null }
+    await Question.findByIdAndUpdate(q._id, { 
+      userAnswer: answers[questionIdStr] || null 
     });
   }
 
+  // --- Dynamic SWOT Generation ---
+  const swotAnalysis = {
+    strengths: [] as string[],
+    weaknesses: [] as string[],
+    opportunities: [] as string[],
+    threats: [] as string[]
+  };
+
+  // Categorize skills based on accuracy
+  for (const [skill, stats] of Object.entries(skillStats)) {
+    const accuracy = stats.correct / stats.total;
+    
+    if (accuracy >= 0.8) {
+      swotAnalysis.strengths.push(`High proficiency in ${skill} (${Math.round(accuracy * 100)}% accuracy).`);
+    } else if (accuracy <= 0.4) {
+      swotAnalysis.weaknesses.push(`Struggled with ${skill} concepts (${Math.round(accuracy * 100)}% accuracy).`);
+    } else {
+      swotAnalysis.opportunities.push(`Review advanced patterns in ${skill} to bridge the gap.`);
+    }
+  }
+
+  // Add a contextual threat based on performance
+  if (swotAnalysis.weaknesses.length > 0) {
+    swotAnalysis.threats.push(`Knowledge gaps in these areas may hinder passing senior-level technical interviews.`);
+  } else {
+    swotAnalysis.threats.push(`Market shift: Competitors are rapidly adopting AI-assisted workflows. Maintain your strong fundamentals while adapting.`);
+  }
+
   // Calculate Percentile
-  await prisma.$executeRaw`
-    WITH Percentiles AS (
-      SELECT id, percent_rank() OVER (ORDER BY score ASC) * 100 as pct
-      FROM "Assessment"
-      WHERE score IS NOT NULL
-    )
-    UPDATE "Assessment"
-    SET score = ${score},
-        percentile = (SELECT pct FROM Percentiles WHERE "Assessment".id = Percentiles.id),
-        status = 'completed'
-    WHERE id = ${id};
-  `;
+  const totalWithScores = await Assessment.countDocuments({ score: { $ne: null } });
+  const lowerOrEqualScores = await Assessment.countDocuments({ score: { $ne: null, $lte: score } });
+  const percentile = totalWithScores > 0 ? (lowerOrEqualScores / totalWithScores) * 100 : 100;
+
+  // Update Assessment
+  await Assessment.findByIdAndUpdate(id, { 
+    score, 
+    percentile: Math.round(percentile),
+    swotAnalysis, // Save SWOT to DB
+    status: 'completed' 
+  });
   
-  return reply.send({ success: true, score });
+  // Return SWOT along with score
+  return reply.send({ success: true, score, percentile: Math.round(percentile), swotAnalysis });
 });
 
 // Start Server
 const start = async () => {
   try {
+    await connectDB(); // Connect to MongoDB before starting Fastify
     await fastify.listen({ port: 4000, host: '0.0.0.0' });
-    console.log(`Server listening on http://localhost:4000`);
+    console.log(`🚀 Server listening on http://localhost:4000`);
   } catch (err) {
     fastify.log.error(err);
     process.exit(1);
