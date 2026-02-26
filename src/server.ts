@@ -6,6 +6,7 @@ import multipart from '@fastify/multipart';
 // CRITICAL: In Node ESM, local imports must end in .js
 import { connectDB, Assessment, Question } from './models.js'; 
 import { assessmentQueue } from './queue.js'; 
+import meetingRoutes from './metting/meeting.route.js'; //Make sure this path is correct
 
 const fastify = Fastify({ logger: true });
 
@@ -13,6 +14,21 @@ const fastify = Fastify({ logger: true });
 fastify.register(cors, { origin: '*' });
 fastify.register(multipart, {
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+// Register meeting routes - add logging to confirm registration
+// Register meeting routes with error handling
+fastify.register(meetingRoutes, { prefix: '/api' })
+  .after((err) => {
+    if (err) {
+      console.error('❌ Failed to register meeting routes:', err);
+    } else {
+      console.log('✅ Meeting routes registered with prefix /api');
+    }
+  });
+// Add a test route to verify server is working
+fastify.get('/test', async () => {
+  return { message: 'Server is working' };
 });
 
 // Upload Route
@@ -27,7 +43,7 @@ fastify.post('/upload', async (request, reply) => {
   const assessment = await Assessment.create({ status: 'uploading' });
 
   await assessmentQueue.add('parse-resume', {
-    assessmentId: assessment._id.toString(), // Pass stringified ObjectId
+    assessmentId: assessment._id.toString(),
     fileBase64 
   });
 
@@ -47,9 +63,9 @@ fastify.get('/status/:id', async (request, reply) => {
 // Get Questions Route
 fastify.get('/test/:id/questions', async (request, reply) => {
   const { id } = request.params as { id: string };
-  
-  // Notice we added 'skill' to the select statement
-  const questions = await Question.find({ assessmentId: id })
+
+    // Notice we added 'skill' to the select statement
+    const questions = await Question.find({ assessmentId: id })
     .select('_id skill text options'); 
 
   const formattedQuestions = questions.map(q => ({
