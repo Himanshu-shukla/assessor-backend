@@ -60,8 +60,10 @@ interface MeetingInput {
     if (data.startTime && data.endTime) {
       const start = data.startTime.split(':').map(Number);
       const end = data.endTime.split(':').map(Number);
-      const startMinutes = start[0] * 60 + start[1];
-      let endMinutes = end[0] * 60 + end[1];
+      
+      // Added ! to tell TS these elements are definitely present
+      const startMinutes = start[0]! * 60 + start[1]!;
+      let endMinutes = end[0]! * 60 + end[1]!;
       
       // Handle meetings that wrap past midnight
       if (endMinutes < startMinutes) {
@@ -81,7 +83,8 @@ interface MeetingInput {
       }
       
       // Check if within working hours (9 AM - 5 PM)
-      if (start[0] < 9 || start[0] >= 17) {
+      // Added ! here as well
+      if (start[0]! < 9 || start[0]! >= 17) {
         errors.push('Meetings are only available between 9 AM and 5 PM');
       }
     }
@@ -90,4 +93,4 @@ interface MeetingInput {
       isValid: errors.length === 0,
       errors
     };
-  };
+};

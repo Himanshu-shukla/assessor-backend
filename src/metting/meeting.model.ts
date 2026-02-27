@@ -67,9 +67,6 @@ meetingSchema.index({ email: 1, status: 1 });
 meetingSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
 
 // --- Middleware ---
-// Using IMeeting as the 'this' type inside the function
-// --- Middleware ---
-// Using async/await is the modern, error-free way to handle Mongoose middleware
 meetingSchema.pre<IMeeting>('save', async function() {
     // Check if we need to recalculate duration
     if (this.isModified('startTime') || this.isModified('endTime')) {
@@ -77,8 +74,9 @@ meetingSchema.pre<IMeeting>('save', async function() {
         const start = this.startTime.split(':').map(Number);
         const end = this.endTime.split(':').map(Number);
         
-        let startMinutes = start[0] * 60 + start[1];
-        let endMinutes = end[0] * 60 + end[1];
+        // Use ! to satisfy TypeScript that index 0 and 1 exist
+        let startMinutes = start[0]! * 60 + start[1]!;
+        let endMinutes = end[0]! * 60 + end[1]!;
   
         // Handle meetings that wrap past midnight
         if (endMinutes < startMinutes) {
@@ -88,8 +86,8 @@ meetingSchema.pre<IMeeting>('save', async function() {
         this.duration = endMinutes - startMinutes;
       }
     }
-    // No need to call next(), Mongoose proceeds when the async function finishes
   });
+
 // --- Instance Methods ---
 meetingSchema.methods.isOverlapping = function(this: IMeeting, otherMeeting: IMeeting): boolean {
   return (
@@ -105,7 +103,12 @@ interface MeetingModel extends Model<IMeeting> {
 }
 
 meetingSchema.statics.calculateEndTime = function(startTime: string, durationMinutes: number): string {
-  const [hours, minutes] = startTime.split(':').map(Number);
+  const parts = startTime.split(':').map(Number);
+  
+  // Use ! for the static method array as well
+  const hours = parts[0]!;
+  const minutes = parts[1]!;
+  
   const totalMinutes = hours * 60 + minutes + durationMinutes;
   
   const endHours = Math.floor((totalMinutes % 1440) / 60);
