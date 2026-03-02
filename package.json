@@ -1,0 +1,39 @@
+{
+  "name": "assessor-backend",
+  "version": "1.0.0",
+  "description": "Backend for Assessment Platform",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "seed": "ts-node src/seed/seed.ts",
+    "start": "node --inspect dist/server.js",
+    "start:pm2": "pm2 start ecosystem.config.js",
+    "db:push": "prisma db push",
+    "db:generate": "prisma generate",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^9.4.0",
+    "@prisma/client": "^7.4.1",
+    "bullmq": "^5.70.1",
+    "dotenv": "^17.3.1",
+    "fastify": "^5.7.4",
+    "groq-sdk": "^0.37.0",
+    "ioredis": "^5.9.3",
+    "mongoose": "^9.2.2",
+    "openai": "^6.25.0",
+    "pdf.js-extract": "^0.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.1",
+    "prisma": "^7.4.1",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}

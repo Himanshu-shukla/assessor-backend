@@ -1,0 +1,42 @@
+import mongoose, { Schema, Document } from "mongoose";
+
+export interface IAssessment extends Document {
+  // New Lead Fields
+  name: string;
+  email: string;
+  phone: string;
+
+  // Existing Fields
+  status: string;
+  resumeText?: string;
+  topSkills?: string[];
+  analysisType?: "test" | "ai";
+  score?: number;
+  percentile?: number;
+  swotAnalysis?: any;
+  aiReport?: any;
+  createdAt: Date;
+}
+
+const AssessmentSchema = new Schema<IAssessment>({
+  // Lead Data stored directly in Assessment
+  name: { type: String, required: true, trim: true },
+  email: { type: String, required: true, lowercase: true, trim: true },
+  phone: { type: String, default: "Not provided" },
+
+  // Assessment Data
+  status: { type: String, default: "uploading" },
+  resumeText: String,
+  topSkills: [String],
+  score: Number,
+  percentile: Number,
+  swotAnalysis: Schema.Types.Mixed,
+  analysisType: { type: String, enum: ["test", "ai"] },
+  aiReport: Schema.Types.Mixed,
+  createdAt: { type: Date, default: Date.now },
+});
+
+export const Assessment = mongoose.model<IAssessment>(
+  "Assessment",
+  AssessmentSchema
+);
