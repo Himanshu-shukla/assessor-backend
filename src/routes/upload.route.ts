@@ -18,10 +18,10 @@ async function extractLeadDetails(text: string) {
 
   const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
   const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
-  
+
   const emailMatch = cleanText.match(emailRegex);
   const phoneMatch = cleanText.match(phoneRegex);
-  
+
   // Safe extraction for the name (usually first line)
   const nameGuess = text.split('\n')[0]?.trim()?.substring(0, 50) ?? "Unknown Candidate";
 
@@ -42,12 +42,16 @@ export default async function (fastify: FastifyInstance) {
 
       const buffer = await file.toBuffer();
       const resumeText = await extractPdfText(buffer);
-      
+
       // 1. Extract Lead details from the text
       const { name, email, phone } = await extractLeadDetails(resumeText);
-      
+
       // 2. Extract skills
       const topSkills = await extractTopSkills(resumeText);
+
+      if (!topSkills || topSkills.length === 0) {
+        return reply.code(400).send({ error: "No technical skills could be detected. Please upload a valid resume." });
+      }
 
       // 3. Create Assessment with all data (Lead info + Skills)
       const assessment = await Assessment.create({
@@ -60,10 +64,10 @@ export default async function (fastify: FastifyInstance) {
       });
 
       const assessmentQuestions = [];
-      
+
       // Deduplicate skills to prevent unnecessary duplicate queries
       const uniqueSkills = [...new Set(topSkills)];
-      
+
       // Create a Set to track questions we've already added
       const seenQuestionIds = new Set<string>();
 
@@ -74,9 +78,9 @@ export default async function (fastify: FastifyInstance) {
           // Check if we have already added this specific question
           const questionBankId = q._id.toString();
           if (seenQuestionIds.has(questionBankId)) {
-            continue; 
+            continue;
           }
-          
+
           seenQuestionIds.add(questionBankId);
 
           const cleanOptions = q.options?.map((opt: any) => {
@@ -85,7 +89,7 @@ export default async function (fastify: FastifyInstance) {
           }) || [];
 
           assessmentQuestions.push({
-            _id: new mongoose.Types.ObjectId(), 
+            _id: new mongoose.Types.ObjectId(),
             assessmentId: assessment._id,
             skill: q.skill,
             subtopic: q.subtopic,
