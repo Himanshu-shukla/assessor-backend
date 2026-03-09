@@ -6,6 +6,8 @@ export interface IAssessment extends Document {
   email: string;
   phone: string;
 
+  sessionId?: string;
+
   // Existing Fields
   status: string;
   resumeText?: string;
@@ -15,6 +17,12 @@ export interface IAssessment extends Document {
   percentile?: number;
   swotAnalysis?: any;
   aiReport?: any;
+  resumeRank?: {
+    rank: number;
+    total: number;
+    percentile: number;
+    profileKey: string;
+  };
   createdAt: Date;
 }
 
@@ -26,6 +34,7 @@ const AssessmentSchema = new Schema<IAssessment>({
 
   // Assessment Data
   status: { type: String, default: "uploading" },
+  sessionId: { type: String, index: true },
   resumeText: String,
   topSkills: [String],
   score: Number,
@@ -33,6 +42,7 @@ const AssessmentSchema = new Schema<IAssessment>({
   swotAnalysis: Schema.Types.Mixed,
   analysisType: { type: String, enum: ["test", "ai"] },
   aiReport: Schema.Types.Mixed,
+  resumeRank: Schema.Types.Mixed,
   createdAt: { type: Date, default: Date.now },
 });
 

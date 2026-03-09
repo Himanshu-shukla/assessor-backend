@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { AssessmentQuestion } from "../models/AssessmentQuestion";
 import { Assessment } from "../models/Assessment";
+import { computeRank } from "./ranking.service";
 
 interface SubtopicStat {
   total: number;
@@ -192,7 +193,26 @@ export async function evaluateTest(
   }
 
   /* -------------------------------------------------------
-     5️⃣ Save Results to Database
+     5️⃣ Compute Composite Rank (Resume + Test blend)
+  ------------------------------------------------------- */
+  let updatedRank = null;
+  try {
+    const assessment = await Assessment.findById(id).lean();
+    const aiTotal: number = (assessment as any)?.aiReport?.total_score ?? 0;
+    const topSkills: string[] = (assessment as any)?.topSkills ?? [];
+
+    // Blend: 60% resume AI score + 40% test score (both normalised to 0-100)
+    const aiPct = (aiTotal / 150) * 100;
+    const blended = aiPct * 0.6 + percentage * 0.4;
+
+    // computeRank expects a raw 0-150 score that maps to 0-100 % internally
+    // Convert blended (0-100) back to 0-150 scale for the ranking service
+    const blendedRaw = (blended / 100) * 150;
+    updatedRank = computeRank(blendedRaw, topSkills);
+  } catch (_) { /* non-critical — proceed without rank update */ }
+
+  /* -------------------------------------------------------
+     6️⃣ Save Results to Database
   ------------------------------------------------------- */
   await Promise.all([
     bulkOps.length > 0
@@ -205,11 +225,12 @@ export async function evaluateTest(
       swotAnalysis: swot,
       status: "completed",
       completedAt: new Date(),
+      ...(updatedRank ? { resumeRank: updatedRank } : {}),
     }),
   ]);
 
   /* -------------------------------------------------------
-     6️⃣ Return Frontend-Ready Structure
+     7️⃣ Return Frontend-Ready Structure
   ------------------------------------------------------- */
   return {
     score: earnedScore,
@@ -217,5 +238,6 @@ export async function evaluateTest(
     percentage,
     percentile: roundedPercentile,
     swotAnalysis: swot,
+    resumeRank: updatedRank,
   };
 }

@@ -10,6 +10,7 @@ import testRoute from "./routes/test.route";
 import statusRoute from "./routes/status.route";
 import meetingRoutes from "./metting/meeting.route";
 import analysisRoute from "./routes/analysis.route";
+import sessionRoute from "./routes/session.route";
 
 
 
@@ -29,6 +30,7 @@ app.register(async function (api) {
   api.register(statusRoute);
   api.register(meetingRoutes);
   api.register(analysisRoute);
+  api.register(sessionRoute);
 }, { prefix: "/api" });
 
 const start = async () => {
