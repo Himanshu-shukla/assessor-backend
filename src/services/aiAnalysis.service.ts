@@ -40,10 +40,12 @@ interface ResumeState {
   combinedParameters?: ResumeScoreParameter[];
   recruiter_report?: any;
   interview_questions?: any;
+  jobDescription?: string;
 }
 
 export async function generateAIResumeAnalysis(
-  resumeText: string
+  resumeText: string,
+  jobDescription?: string
 ): Promise<ResumeAnalysisResult | null> {
   try {
     const groqApiKey = process.env.GROQ_API_KEY;
@@ -103,6 +105,7 @@ export async function generateAIResumeAnalysis(
     }
 
     const careerAgentPrompt = `You are a specialized Career Trajectory AI Agent. You evaluate career progression and overall strength.
+${jobDescription ? `CRITICAL: The candidate is applying for the following Job Description. Your scoring MUST heavily weigh how well their career direction and specific experiences align with these exact requirements.\nJOB DESCRIPTION:\n${jobDescription}\n` : ""}
 EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 1. Clarity of Career Direction
 3. Relevance to Job Description (or general industry expections)
@@ -121,6 +124,7 @@ Return ONLY valid JSON in this exact structure:
 `;
 
     const techAgentPrompt = `You are a specialized Technical Depth AI Agent. You evaluate technical skills, architecture exposure, projects, and education.
+${jobDescription ? `CRITICAL: The candidate is applying for the following Job Description. Your scoring MUST strictly evaluate their technical skills against the specific tech stack, frameworks, and tools mentioned in this description.\nJOB DESCRIPTION:\n${jobDescription}\n` : ""}
 EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 6. Technical Skill Depth
 7. Project Quality & Complexity
@@ -263,6 +267,7 @@ Return ONLY valid JSON in this exact structure:
       combinedParameters: Annotation<ResumeScoreParameter[]>({ reducer: (x, y) => y ?? x }),
       recruiter_report: Annotation<any>({ reducer: (x, y) => y ?? x }),
       interview_questions: Annotation<any>({ reducer: (x, y) => y ?? x }),
+      jobDescription: Annotation<string | undefined>({ reducer: (x, y) => y ?? x }),
     });
 
     const workflow = new StateGraph(ResumeStateAnnotation)
@@ -288,7 +293,7 @@ Return ONLY valid JSON in this exact structure:
 
     const app = workflow.compile();
 
-    const result = await app.invoke({ rawResume: resumeText });
+    const result = await app.invoke({ rawResume: resumeText, jobDescription });
 
     return {
       total_score: (result.finalScore as number) || 0,

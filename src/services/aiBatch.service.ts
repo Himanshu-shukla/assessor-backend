@@ -15,7 +15,7 @@ export const batchAnalysisQueue = new Queue("BatchAnalysisQueue", {
 const worker = new Worker(
   "BatchAnalysisQueue",
   async (job: Job) => {
-    const { assessmentId } = job.data;
+    const { assessmentId, jobDescription } = job.data;
     
     // Process the individual assessment
     const assessment = await Assessment.findById(assessmentId);
@@ -29,7 +29,7 @@ const worker = new Worker(
         return { status: "skipped", reason: "AI report already exists" };
     }
 
-    const aiReport = await generateAIResumeAnalysis(assessment.resumeText);
+    const aiReport = await generateAIResumeAnalysis(assessment.resumeText, jobDescription);
     const resumeRank = computeRank(aiReport?.total_score ?? 0, assessment.topSkills ?? []);
 
     assessment.analysisType = "ai";
