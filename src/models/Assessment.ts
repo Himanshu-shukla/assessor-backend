@@ -23,6 +23,8 @@ export interface IAssessment extends Document {
     percentile: number;
     profileKey: string;
   };
+  battleWins?: number;
+  battleLosses?: number;
   createdAt: Date;
 }
 
@@ -43,6 +45,8 @@ const AssessmentSchema = new Schema<IAssessment>({
   analysisType: { type: String, enum: ["test", "ai"] },
   aiReport: Schema.Types.Mixed,
   resumeRank: Schema.Types.Mixed,
+  battleWins: { type: Number, default: 0 },
+  battleLosses: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now },
 });
 

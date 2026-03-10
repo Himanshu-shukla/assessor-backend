@@ -18,6 +18,7 @@ interface ResumeAnalysisResult {
     strengths: string[];
     weaknesses: string[];
     risk_flags: string[];
+    skill_gaps: string[];
     recommendation: string;
   };
   interview_questions?: {
@@ -188,11 +189,13 @@ Return ONLY valid JSON in this exact structure:
 
     const reportAgentPrompt = `You are an Executive Recruiter synthesizing a final candidate report.
 Based on the candidate's parsed resume and evaluations, provide a summary report.
+Identify missing skills required for target roles (Skill Gap Detection) and suggest skills that improve employability. Look for missing technologies or skills like "Missing SQL optimization", "No dashboard projects", "No measurable impact metrics".
 Return ONLY valid JSON in this exact structure:
 {
   "strengths": ["point 1", "point 2"],
   "weaknesses": ["point 1", "point 2"],
   "risk_flags": ["point 1", "point 2"],
+  "skill_gaps": ["gap 1", "gap 2"],
   "recommendation": "string (e.g., Strong Hire, Proceed with Caution, Reject)"
 }
 `;

@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify";
 import { Assessment } from "../models/Assessment";
 import { generateAIResumeAnalysis } from "../services/aiAnalysis.service";
 import { computeRank } from "../services/ranking.service";
-import { batchAnalysisQueue } from "../services/aiBatch.service";
+import { batchAnalysisQueue, enqueueBulkAssessments } from "../services/aiBatch.service";
 
 export default async function (fastify: FastifyInstance) {
 
@@ -91,6 +91,48 @@ export default async function (fastify: FastifyInstance) {
     }
   });
 
+  // 🔹 GET — Fetch 2 Random Resumes for Battle
+  fastify.get("/analysis/battle/matchup", async (req: any, reply) => {
+    try {
+      // Find 2 random assessments that already have an AI Report
+      const candidates = await Assessment.aggregate([
+        { $match: { aiReport: { $exists: true } } },
+        { $sample: { size: 2 } },
+        { $project: { _id: 1, name: 1, topSkills: 1, aiReport: 1, battleWins: 1, battleLosses: 1 } }
+      ]);
+
+      if (candidates.length < 2) {
+        return reply.code(400).send({ error: "Not enough analyzed resumes to battle." });
+      }
+
+      return reply.send({ candidates });
+    } catch (error: any) {
+      console.error("BATTLE MATCHUP ERROR:", error);
+      return reply.code(500).send({ error: "Failed to fetch matchup" });
+    }
+  });
+
+  // 🔹 POST — Record Battle Vote
+  fastify.post("/analysis/battle/vote", async (req: any, reply) => {
+    try {
+      const { winnerId, loserId } = req.body as { winnerId: string, loserId: string };
+
+      if (!winnerId || !loserId) {
+        return reply.code(400).send({ error: "Missing winner or loser ID" });
+      }
+
+      await Promise.all([
+        Assessment.findByIdAndUpdate(winnerId, { $inc: { battleWins: 1 } }),
+        Assessment.findByIdAndUpdate(loserId, { $inc: { battleLosses: 1 } })
+      ]);
+
+      return reply.send({ message: "Vote recorded successfully" });
+    } catch (error: any) {
+      console.error("BATTLE VOTE ERROR:", error);
+      return reply.code(500).send({ error: "Failed to record vote" });
+    }
+  });
+
   // 🔹 POST — Submit Batch Analysis
   fastify.post("/analysis/batch", async (req: any, reply) => {
     try {
@@ -100,14 +142,24 @@ export default async function (fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid payload. Expected assessmentIds array." });
       }
 
-      const jobs = await batchAnalysisQueue.addBulk(
-        assessmentIds.map(id => ({
-          name: "analyze-resume",
-          data: { assessmentId: id, jobDescription }
-        }))
-      );
+      // Fetch ONLY what is needed, lean() for speed
+      const assessmentsToProcess = await Assessment.find({
+        _id: { $in: assessmentIds },
+        aiReport: { $exists: false }
+      })
+      .select('_id resumeText topSkills')
+      .lean();
 
-      return reply.send({ message: "Batch analysis started", jobIds: jobs.map(j => j.id) });
+      if (assessmentsToProcess.length === 0) {
+        return reply.send({ message: "No assessments needed processing.", jobIds: [] });
+      }
+
+      await enqueueBulkAssessments(assessmentsToProcess, jobDescription);
+
+      return reply.send({ 
+        message: "Batch analysis started", 
+        jobIds: assessmentsToProcess.map((a: any) => `assessment-${a._id}`) 
+      });
     } catch (error: any) {
       console.error("BATCH ERROR:", error);
       return reply.code(500).send({ error: "Batch submission failed" });
