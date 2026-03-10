@@ -100,16 +100,14 @@ export default async function (fastify: FastifyInstance) {
         return reply.code(400).send({ error: "Invalid payload. Expected assessmentIds array." });
       }
 
-      const jobs = await Promise.all(
-        assessmentIds.map(id =>
-          batchAnalysisQueue.add("analyze-resume", { assessmentId: id, jobDescription })
-        )
+      const jobs = await batchAnalysisQueue.addBulk(
+        assessmentIds.map(id => ({
+          name: "analyze-resume",
+          data: { assessmentId: id, jobDescription }
+        }))
       );
 
-      return {
-        message: "Batch analysis started",
-        jobIds: jobs.map(j => j.id)
-      };
+      return reply.send({ message: "Batch analysis started", jobIds: jobs.map(j => j.id) });
     } catch (error: any) {
       console.error("BATCH ERROR:", error);
       return reply.code(500).send({ error: "Batch submission failed" });

@@ -39,7 +39,7 @@ const worker = new Worker(
 
     return { status: "completed", assessmentId, total_score: aiReport?.total_score };
   },
-  { connection: redisConnection, concurrency: 5 } // Process up to 5 resumes concurrently
+  { connection: redisConnection, concurrency: 50 } // Increased significantly for 500+ scale bulk screening
 );
 
 worker.on("completed", (job) => {
