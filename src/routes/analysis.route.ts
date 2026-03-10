@@ -2,6 +2,7 @@ import { FastifyInstance } from "fastify";
 import { Assessment } from "../models/Assessment";
 import { generateAIResumeAnalysis } from "../services/aiAnalysis.service";
 import { computeRank } from "../services/ranking.service";
+import { batchAnalysisQueue } from "../services/aiBatch.service";
 
 export default async function (fastify: FastifyInstance) {
 
@@ -87,6 +88,57 @@ export default async function (fastify: FastifyInstance) {
     } catch (error: any) {
       console.error("FETCH ERROR:", error);
       return reply.code(500).send({ error: "Failed to fetch analysis" });
+    }
+  });
+
+  // 🔹 POST — Submit Batch Analysis
+  fastify.post("/analysis/batch", async (req: any, reply) => {
+    try {
+      const { assessmentIds, jobDescription } = req.body as { assessmentIds: string[], jobDescription?: string };
+
+      if (!assessmentIds || !Array.isArray(assessmentIds)) {
+        return reply.code(400).send({ error: "Invalid payload. Expected assessmentIds array." });
+      }
+
+      const jobs = await Promise.all(
+        assessmentIds.map(id =>
+          batchAnalysisQueue.add("analyze-resume", { assessmentId: id, jobDescription })
+        )
+      );
+
+      return {
+        message: "Batch analysis started",
+        jobIds: jobs.map(j => j.id)
+      };
+    } catch (error: any) {
+      console.error("BATCH ERROR:", error);
+      return reply.code(500).send({ error: "Batch submission failed" });
+    }
+  });
+
+  // 🔹 POST — Get Batch Job Statuses
+  fastify.post("/analysis/batch/status", async (req: any, reply) => {
+    try {
+      const { jobIds } = req.body as { jobIds: string[] };
+
+      if (!jobIds || !Array.isArray(jobIds)) {
+        return reply.code(400).send({ error: "Invalid payload. Expected jobIds array." });
+      }
+
+      const statuses = await Promise.all(
+        jobIds.map(async (id) => {
+          const job = await batchAnalysisQueue.getJob(id);
+          if (!job) return { id, state: "not-found" };
+          const state = await job.getState();
+          const result = job.returnvalue;
+          return { id, state, result };
+        })
+      );
+
+      return { statuses };
+    } catch (error: any) {
+      console.error("BATCH STATUS ERROR:", error);
+      return reply.code(500).send({ error: "Status check failed" });
     }
   });
 
