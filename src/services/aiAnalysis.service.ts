@@ -18,7 +18,30 @@ interface ResumeAnalysisResult {
     strengths: string[];
     weaknesses: string[];
     risk_flags: string[];
-    skill_gaps: string[];
+    career_trajectory?: {
+      skill_gaps: string[];
+      career_paths?: {
+        role: string;
+        salary: string;
+      }[];
+      rejection_simulation?: {
+        rejection_time_seconds: number;
+        rejection_reasons: string[];
+      };
+      salary_growth_prediction?: {
+        current_expected_3yr: string;
+        target_expected_3yr: string;
+        skills_to_learn: string[];
+      };
+      strategic_career_guidance?: {
+        current_path_growth_probability: number;
+        better_paths: {
+          current_role: string;
+          target_role: string;
+          salary_growth_percentage: number;
+        }[];
+      };
+    };
     recommendation: string;
   };
   interview_questions?: {
@@ -113,13 +136,15 @@ EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 8. Work Experience Strength
 15. Differentiation Factor (What makes this candidate stand out?)
 
+CRITICAL INSTRUCTION: For "comments", DO NOT provide explanations or long paragraphs. Provide ONLY 1-2 short, impactful bullet points.
+
 Return ONLY valid JSON in this exact structure:
 {
   "parameters": [
-    { "id": 1, "parameter": "Clarity of Career Direction", "score": number, "comments": "string" },
-    { "id": 3, "parameter": "Relevance to Job Description", "score": number, "comments": "string" },
-    { "id": 8, "parameter": "Work Experience Strength", "score": number, "comments": "string" },
-    { "id": 15, "parameter": "Differentiation Factor", "score": number, "comments": "string" }
+    { "id": 1, "parameter": "Clarity of Career Direction", "score": number, "comments": "• Short point 1" },
+    { "id": 3, "parameter": "Relevance to Job Description", "score": number, "comments": "• Short point 1" },
+    { "id": 8, "parameter": "Work Experience Strength", "score": number, "comments": "• Short point 1" },
+    { "id": 15, "parameter": "Differentiation Factor", "score": number, "comments": "• Short point 1" }
   ]
 }
 `;
@@ -131,12 +156,14 @@ EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 7. Project Quality & Complexity
 11. Education & Certifications
 
+CRITICAL INSTRUCTION: For "comments", DO NOT provide explanations or long paragraphs. Provide ONLY 1-2 short, impactful bullet points.
+
 Return ONLY valid JSON in this exact structure:
 {
   "parameters": [
-    { "id": 6, "parameter": "Technical Skill Depth", "score": number, "comments": "string" },
-    { "id": 7, "parameter": "Project Quality & Complexity", "score": number, "comments": "string" },
-    { "id": 11, "parameter": "Education & Certifications", "score": number, "comments": "string" }
+    { "id": 6, "parameter": "Technical Skill Depth", "score": number, "comments": "• Short point 1" },
+    { "id": 7, "parameter": "Project Quality & Complexity", "score": number, "comments": "• Short point 1" },
+    { "id": 11, "parameter": "Education & Certifications", "score": number, "comments": "• Short point 1" }
   ]
 }
 `;
@@ -148,13 +175,15 @@ EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 9. Problem-Solving & Ownership
 10. Leadership & Collaboration
 
+CRITICAL INSTRUCTION: For "comments", DO NOT provide explanations or long paragraphs. Provide ONLY 1-2 short, impactful bullet points.
+
 Return ONLY valid JSON in this exact structure:
 {
   "parameters": [
-    { "id": 4, "parameter": "Achievement Orientation", "score": number, "comments": "string" },
-    { "id": 5, "parameter": "Quantification of Impact", "score": number, "comments": "string" },
-    { "id": 9, "parameter": "Problem-Solving & Ownership", "score": number, "comments": "string" },
-    { "id": 10, "parameter": "Leadership & Collaboration", "score": number, "comments": "string" }
+    { "id": 4, "parameter": "Achievement Orientation", "score": number, "comments": "• Short point 1" },
+    { "id": 5, "parameter": "Quantification of Impact", "score": number, "comments": "• Short point 1" },
+    { "id": 9, "parameter": "Problem-Solving & Ownership", "score": number, "comments": "• Short point 1" },
+    { "id": 10, "parameter": "Leadership & Collaboration", "score": number, "comments": "• Short point 1" }
   ]
 }
 `;
@@ -166,13 +195,15 @@ EVALUATE THE FOLLOWING PARAMETERS (Score 0-10):
 13. ATS Optimization
 14. Professionalism & Language Quality
 
+CRITICAL INSTRUCTION: For "comments", DO NOT provide explanations or long paragraphs. Provide ONLY 1-2 short, impactful bullet points.
+
 Return ONLY valid JSON in this exact structure:
 {
   "parameters": [
-    { "id": 2, "parameter": "Professional Summary Quality", "score": number, "comments": "string" },
-    { "id": 12, "parameter": "Resume Structure & Formatting", "score": number, "comments": "string" },
-    { "id": 13, "parameter": "ATS Optimization", "score": number, "comments": "string" },
-    { "id": 14, "parameter": "Professionalism & Language Quality", "score": number, "comments": "string" }
+    { "id": 2, "parameter": "Professional Summary Quality", "score": number, "comments": "• Short point 1" },
+    { "id": 12, "parameter": "Resume Structure & Formatting", "score": number, "comments": "• Short point 1" },
+    { "id": 13, "parameter": "ATS Optimization", "score": number, "comments": "• Short point 1" },
+    { "id": 14, "parameter": "Professionalism & Language Quality", "score": number, "comments": "• Short point 1" }
   ]
 }
 `;
@@ -190,12 +221,22 @@ Return ONLY valid JSON in this exact structure:
     const reportAgentPrompt = `You are an Executive Recruiter synthesizing a final candidate report.
 Based on the candidate's parsed resume and evaluations, provide a summary report.
 Identify missing skills required for target roles (Skill Gap Detection) and suggest skills that improve employability. Look for missing technologies or skills like "Missing SQL optimization", "No dashboard projects", "No measurable impact metrics".
+Predict the best career moves based on the candidate's current role and profile. Provide roles and estimated Median salary (e.g. "₹22 LPA" or "$110k").
+Simulate an overworked, cynical recruiter. Calculate the exact time in seconds it would take to reject this resume (e.g., 4.8). Provide brutal, realistic reasons for rejection in "rejection_simulation" (like "Weak first bullet points", "No measurable impact", "Skills not aligned with JD"). Keep times typically under 10 seconds.
+Predict salary growth after 3 years. Estimate "current_expected_3yr" (e.g., "₹12 LPA" or "$80k") based on current trajectory. Then, predict a "target_expected_3yr" (e.g., "₹18 LPA" or "$120k") IF they learn a specific set of 3 "skills_to_learn".
+Provide "strategic_career_guidance" including "current_path_growth_probability" (0-100) and 2 "better_paths" with "current_role", "target_role", and a "salary_growth_percentage" (e.g., 65).
 Return ONLY valid JSON in this exact structure:
 {
   "strengths": ["point 1", "point 2"],
   "weaknesses": ["point 1", "point 2"],
   "risk_flags": ["point 1", "point 2"],
-  "skill_gaps": ["gap 1", "gap 2"],
+  "career_trajectory": {
+    "skill_gaps": ["gap 1", "gap 2"],
+    "career_paths": [{ "role": "string", "salary": "string" }],
+    "rejection_simulation": { "rejection_time_seconds": 4.8, "rejection_reasons": ["reason 1", "reason 2"] },
+    "salary_growth_prediction": { "current_expected_3yr": "string", "target_expected_3yr": "string", "skills_to_learn": ["skill 1", "skill 2", "skill 3"] },
+    "strategic_career_guidance": { "current_path_growth_probability": 42, "better_paths": [{ "current_role": "Data Analyst", "target_role": "Product Analyst", "salary_growth_percentage": 65 }] }
+  },
   "recommendation": "string (e.g., Strong Hire, Proceed with Caution, Reject)"
 }
 `;
@@ -288,7 +329,10 @@ Return ONLY valid JSON in this exact structure:
       .addEdge("parser", "tech")
       .addEdge("parser", "impact")
       .addEdge("parser", "ats")
-      .addEdge(["career", "tech", "impact", "ats"], "aggregator")
+      .addEdge("career", "aggregator")
+      .addEdge("tech", "aggregator")
+      .addEdge("impact", "aggregator")
+      .addEdge("ats", "aggregator")
       .addEdge("aggregator", "interview")
       .addEdge("aggregator", "report")
       .addEdge("interview", END)
