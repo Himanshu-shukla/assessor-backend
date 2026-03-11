@@ -247,38 +247,38 @@ Return ONLY valid JSON in this exact structure:
     const atsNode = createEvaluator(atsAgentPrompt, "ats");
 
     async function interviewNode(state: ResumeState) {
-        const messages = [
-            new SystemMessage(interviewAgentPrompt),
-            new HumanMessage(JSON.stringify(state.parsedData || state.rawResume))
-        ];
-        const response = await llm.invoke(messages);
-        let interview_questions = {};
-        try {
-            interview_questions = await jsonParser.parse(response.content as string);
-        } catch (e) {
-            console.error("Failed to parse interview questions", e);
-        }
-        return { interview_questions };
+      const messages = [
+        new SystemMessage(interviewAgentPrompt),
+        new HumanMessage(JSON.stringify(state.parsedData || state.rawResume))
+      ];
+      const response = await llm.invoke(messages);
+      let interview_questions = {};
+      try {
+        interview_questions = await jsonParser.parse(response.content as string);
+      } catch (e) {
+        console.error("Failed to parse interview questions", e);
+      }
+      return { interview_questions };
     }
 
     async function reportNode(state: ResumeState) {
-        // Feed the parsed data AND the generated parameters to the report node
-        const payload = {
-            parsedData: state.parsedData || state.rawResume,
-            evaluations: state.evaluations
-        };
-        const messages = [
-            new SystemMessage(reportAgentPrompt),
-            new HumanMessage(JSON.stringify(payload))
-        ];
-        const response = await llm.invoke(messages);
-        let recruiter_report = {};
-        try {
-            recruiter_report = await jsonParser.parse(response.content as string);
-        } catch (e) {
-            console.error("Failed to parse recruiter report", e);
-        }
-        return { recruiter_report };
+      // Feed the parsed data AND the generated parameters to the report node
+      const payload = {
+        parsedData: state.parsedData || state.rawResume,
+        evaluations: state.evaluations
+      };
+      const messages = [
+        new SystemMessage(reportAgentPrompt),
+        new HumanMessage(JSON.stringify(payload))
+      ];
+      const response = await llm.invoke(messages);
+      let recruiter_report = {};
+      try {
+        recruiter_report = await jsonParser.parse(response.content as string);
+      } catch (e) {
+        console.error("Failed to parse recruiter report", e);
+      }
+      return { recruiter_report };
     }
 
     async function scoreAggregatorNode(state: ResumeState) {
@@ -301,17 +301,17 @@ Return ONLY valid JSON in this exact structure:
     }
 
     const ResumeStateAnnotation = Annotation.Root({
-      rawResume: Annotation<string>({ reducer: (x, y) => y ?? x, default: () => "" }),
-      parsedData: Annotation<any>({ reducer: (x, y) => y ?? x }),
+      rawResume: Annotation<string>({ reducer: (x: string, y: string) => y ?? x, default: () => "" }),
+      parsedData: Annotation<any>({ reducer: (x: any, y: any) => y ?? x }),
       evaluations: Annotation<ResumeState["evaluations"]>({
-        reducer: (x, y) => ({ ...x, ...y }),
+        reducer: (x: ResumeState["evaluations"], y: ResumeState["evaluations"]) => ({ ...x, ...y }),
         default: () => ({})
       }),
-      finalScore: Annotation<number>({ reducer: (x, y) => y ?? x }),
-      combinedParameters: Annotation<ResumeScoreParameter[]>({ reducer: (x, y) => y ?? x }),
-      recruiter_report: Annotation<any>({ reducer: (x, y) => y ?? x }),
-      interview_questions: Annotation<any>({ reducer: (x, y) => y ?? x }),
-      jobDescription: Annotation<string | undefined>({ reducer: (x, y) => y ?? x }),
+      finalScore: Annotation<number>({ reducer: (x: number, y: number) => y ?? x }),
+      combinedParameters: Annotation<ResumeScoreParameter[]>({ reducer: (x: ResumeScoreParameter[], y: ResumeScoreParameter[]) => y ?? x }),
+      recruiter_report: Annotation<any>({ reducer: (x: any, y: any) => y ?? x }),
+      interview_questions: Annotation<any>({ reducer: (x: any, y: any) => y ?? x }),
+      jobDescription: Annotation<string | undefined>({ reducer: (x: string | undefined, y: string | undefined) => y ?? x }),
     });
 
     const workflow = new StateGraph(ResumeStateAnnotation)
